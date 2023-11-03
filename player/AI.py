@@ -250,46 +250,278 @@ class AI:
         return arr
 
 
-    def calculateb(self,gametiles):
-        value=0
-        for x in range(8):
-            for y in range(8):
-                    if gametiles[y][x].pieceonTile.tostring()=='P':
-                        value=value-100
+    def calculateb(self, gametiles):
+        # TODO: Fix Pawn Promotion
+        # TODO: write past moves to a file and then read them to see if the same position has been repeated 3 times?
 
-                    if gametiles[y][x].pieceonTile.tostring()=='N':
-                        value=value-350
+        value, bvalue, wvalue = 0, 0, 0
+        num_P, num_p, num_N, num_n, num_R, num_r, num_B, num_b, num_Q, num_q = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        pawn_multiplier = {
+            0: 0,
+            1: 1,
+            2: 1.1,
+            3: 1.2,
+            4: 1.6,
+            5: 1.8,
+            6: 2,
+            7: 9
+        }
 
-                    if gametiles[y][x].pieceonTile.tostring()=='B':
-                        value=value-350
+        # Impl taken from move.py
+        def is_checked(alliance, r, c, gametiles):
+            for m in range(8):
+                for k in range(8):
+                    tmp_piece = gametiles[m][k].pieceonTile
+                    if tmp_piece.alliance is not None:
+                        if tmp_piece.alliance != alliance:
+                            # print(m, k)
+                            moves = gametiles[m][k].pieceonTile.legalmoveb(gametiles)
+                            if moves is None:
+                                continue
+                            for move in moves:
+                                if move[0] == r and move[1] == c:
+                                    return True
+            return False
 
-                    if gametiles[y][x].pieceonTile.tostring()=='R':
-                        value=value-525
+        def is_checkmate(piece, r, c, gametiles):
+            movex = move()
+            if is_checked(piece.alliance, r, c, gametiles):
+                array = movesifchecked(piece.alliance, r, c, gametiles)
+                if len(array) == 0:
+                    return True
+            return False
 
-                    if gametiles[y][x].pieceonTile.tostring()=='Q':
-                        value=value-1000
+        def is_pawn_diagonal(piece, r, c, gametiles):
+            if piece.alliance == 'Black' and r <= 6 and 6 >= c >= 1:
+                if gametiles[r + 1][c + 1].pieceonTile.tostring() == 'P' or gametiles[r + 1][c - 1].pieceonTile.tostring() == 'P':
+                    return True
+            elif piece.alliance == 'White' and r >= 1 and 6 >= c >= 1:
+                if gametiles[r - 1][c + 1].pieceonTile.tostring() == 'p' or gametiles[r - 1][c - 1].pieceonTile.tostring() == 'p':
+                    return True
+            return False
 
-                    if gametiles[y][x].pieceonTile.tostring()=='K':
-                        value=value-10000
+        def center_control(row):
+            if row is 3 or row is 4:
+                return 20
+            return 0
+        def is_stalemate(gametiles, player):
+            movex = move()
+            if not player:
+                # Alliance is Black
+                r, c, = None, None
+                for i in range(8):
+                    for j in range(8):
+                        if gametiles[i][j].pieceonTile.tostring == 'K':
+                            r = j
+                            c = i
+                if is_checked('Black', r, c, gametiles):
+                    check = False
+                    for x in range(8):
+                        for y in range(8):
+                            if gametiles[y][x].pieceonTile.alliance == 'Black':
+                                moves1 = gametiles[y][x].pieceonTile.legalmoveb(gametiles)
+                                if moves1 is None:
+                                    continue
+                                lx1 = movex.pinnedb(gametiles, moves1, y, x)
+                                if len(lx1) == 0:
+                                    continue
+                                else:
+                                    check = True
+                                if check:
+                                    break
+                        if check:
+                            break
 
-                    if gametiles[y][x].pieceonTile.tostring()=='p':
-                        value=value+100
+                    if not check:
+                        return True
 
-                    if gametiles[y][x].pieceonTile.tostring()=='n':
-                        value=value+350
+            if player:
+                # Alliance is Black
+                r, c, = None, None
+                for i in range(8):
+                    for j in range(8):
+                        if gametiles[i][j].pieceonTile.tostring == 'k':
+                            r = j
+                            c = i
+                if is_checked('White', r, c, gametiles):
+                    check = False
+                    for x in range(8):
+                        for y in range(8):
+                            if gametiles[y][x].pieceonTile.alliance == 'White':
+                                moves1 = gametiles[y][x].pieceonTile.legalmoveb(gametiles)
+                                if moves1 is None:
+                                    continue
+                                lx1 = movex.pinnedw(gametiles, moves1, y, x)
+                                if len(lx1) == 0:
+                                    continue
+                                else:
+                                    check = True
+                                if check == True:
+                                    break
+                        if check == True:
+                            break
 
-                    if gametiles[y][x].pieceonTile.tostring()=='b':
-                        value=value+350
+                    if check == False:
+                        return True
 
-                    if gametiles[y][x].pieceonTile.tostring()=='r':
-                        value=value+525
+        def movesifchecked(alliance, r, c, gametiles):
+            movi = []
+            piece = None
+            for m in range(8):
+                for k in range(8):
+                    if gametiles[m][k].pieceonTile.alliance == alliance:
+                        moves = gametiles[m][k].pieceonTile.legalmoveb(gametiles)
+                        for move in moves:
+                            x = move[0]
+                            y = move[1]
+                            piece = gametiles[x][y].pieceonTile
+                            gametiles[x][y].pieceonTile = gametiles[m][k].pieceonTile
+                            gametiles[m][k].pieceonTile = nullpiece()
+                            s = self.updateposition(x, y)
+                            gametiles[x][y].pieceonTile.position = s
+                            if not is_checked(alliance, r, c, gametiles):
+                                movi.append([m, k, x, y])
+                                gametiles[m][k].pieceonTile = gametiles[x][y].pieceonTile
+                                gametiles[x][y].pieceonTile = piece
+                                s = self.updateposition(m, k)
+                                gametiles[m][k].pieceonTile.position = s
+                            else:
+                                gametiles[m][k].pieceonTile = gametiles[x][y].pieceonTile
+                                gametiles[x][y].pieceonTile = piece
+                                s = self.updateposition(m, k)
+                                gametiles[m][k].pieceonTile.position = s
+            return movi
 
-                    if gametiles[y][x].pieceonTile.tostring()=='q':
-                        value=value+1000
+        def num_moves(piece, gametiles):
+            moves = piece.legalmoveb(gametiles)
+            return 0 if moves is None else len(moves) * 10
 
-                    if gametiles[y][x].pieceonTile.tostring()=='k':
-                        value=value+10000
+        for row in range(8):
+            for col in range(8):
+                piece = gametiles[row][col].pieceonTile
+                match piece.tostring():
+                    case 'P':
+                        bvalue -= (100 * pawn_multiplier[row])
+                        bvalue -= num_moves(piece, gametiles)
+                        num_P += 1
+                        if is_pawn_diagonal(piece, row, col, gametiles):
+                            bvalue -= (20 * pawn_multiplier[row])
+                    case 'N':
+                        bvalue -= 300
+                        bvalue -= num_moves(piece, gametiles)
+                        num_N += 1
+                        bvalue -= center_control(row)
+                    case 'B':
+                        bvalue -= 300
+                        bvalue -= num_moves(piece, gametiles)
+                        bvalue -= center_control(row)
+                        num_B += 1
+                    case 'R':
+                        bvalue -= 500
+                        bvalue -= num_moves(piece, gametiles)
+                        num_R += 1
+                        bvalue -= center_control(row)
+                    case 'Q':
+                        bvalue -= 950
+                        bvalue -= num_moves(piece, gametiles) / 10
+                        bvalue -= center_control(row)
+                        num_Q += 1
+                    case 'K':
+                        bvalue -= 10000
+                        bvalue -= num_moves(piece, gametiles)
 
+                        # is king checkmate?
+                        if is_checkmate(piece, row, col, gametiles):
+                            bvalue += 1000000
+
+                        # Is the king checked?
+                        elif is_checked(piece.alliance, row, col, gametiles) == 'Checked':
+                            bvalue += 450
+
+                        # Is there a pawn in front of the king?
+                        if gametiles[row - 1][col].pieceonTile.tostring() == 'P':
+                            # is the rook next to the king?
+                            if col is not (0 or 7):
+                                if gametiles[row][col - 1].pieceonTile.tostring() == 'R' or gametiles[row][col + 1].pieceonTile.tostring() == 'R':
+                                    bvalue -= 400
+                    case 'p':
+                        wvalue += (100 * pawn_multiplier[7 - row])
+                        wvalue += num_moves(piece, gametiles)
+                        num_p += 1
+                        if is_pawn_diagonal(piece, row, col, gametiles):
+                            wvalue += (20 * pawn_multiplier[row])
+
+                    case 'n':
+                        wvalue += 300
+                        wvalue += num_moves(piece, gametiles)
+                        num_n += 1
+                        wvalue += center_control(row)
+                    case 'b':
+                        wvalue += 300
+                        wvalue += center_control(row)
+                        wvalue += center_control(row)
+                        num_b += 1
+                    case 'r':
+                        wvalue += 500
+                        wvalue += num_moves(piece, gametiles)
+                        wvalue += center_control(row)
+                        num_r += 1
+                    case 'q':
+                        wvalue += 950
+                        wvalue += num_moves(piece, gametiles) / 10
+                        wvalue += center_control(row)
+                        num_q += 1
+                    case 'k':
+                        wvalue += 10000
+                        wvalue += num_moves(piece, gametiles)
+
+                        # if stalemate
+                        # if is_stalemate(gametiles, True):
+                        #     wvalue += 1000000
+
+                        # is king checkmate?
+                        if is_checkmate(piece, row, col, gametiles):
+                            wvalue -= 1000000
+
+                        # Is the king checked?
+                        elif is_checked(piece.alliance, row, col, gametiles) == 'Checked':
+                            wvalue -= 450
+
+                        # Is there a pawn in front of the king?
+                        if gametiles[row - 1][col].pieceonTile.tostring() == 'p':
+                            # is the rook next to the king?
+                            if col is not (0 or 7):
+                                if gametiles[row][col - 1].pieceonTile.tostring() == 'r' or gametiles[row][col + 1].pieceonTile.tostring() == 'r':
+                                    wvalue += 400
+                    case '_':
+                        pass
+        if (bvalue + wvalue) < 0:
+            # Black is winning
+            if is_stalemate(gametiles, False):
+                value = 1000000
+        elif (bvalue + wvalue) > 0:
+            # White is winning
+            if bvalue > -11000 and is_stalemate(gametiles, True):
+                value = -1000000
+        #pair bonus:
+        if num_N == 2:
+            bvalue -= 10
+        if num_n == 2:
+            wvalue += 10
+        if num_R == 2:
+            bvalue -= 10
+        if num_r == 2:
+            wvalue += 10
+        if num_B == 2:
+            bvalue -= 10
+        if num_b == 2:
+            wvalue += 10
+        if num_Q >= 2:
+            bvalue -= 500*num_Q
+        if num_q >= 2:
+            wvalue += 500*num_q
+
+        value += (bvalue + wvalue)
         return value
 
 
